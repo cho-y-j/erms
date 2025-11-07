@@ -65,20 +65,31 @@ app.use((_req: express.Request, res: express.Response) => {
 
 // Vercel serverless 함수 핸들러
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 모든 응답이 JSON 형식인지 보장
+  const originalJson = res.json.bind(res);
+  res.json = function(body: any) {
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+    return originalJson(body);
+  };
+
   try {
     // Express 앱을 요청/응답에 연결
-    return new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       app(req as any, res as any, (err: any) => {
         if (err) {
           console.error("[API] Express error:", err);
           // 에러가 발생해도 JSON 응답 보장
           if (!res.headersSent) {
+            res.setHeader('Content-Type', 'application/json');
             res.status(500).json({
               error: "Internal server error",
               message: err.message || "An unexpected error occurred",
+              stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
             });
           }
-          resolve(); // reject 대신 resolve로 변경하여 Vercel이 에러 페이지를 반환하지 않도록
+          resolve();
         } else {
           resolve();
         }
@@ -87,9 +98,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     console.error("[API] Handler error:", error);
     if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({
         error: "Internal server error",
         message: error.message || "An unexpected error occurred",
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
   }

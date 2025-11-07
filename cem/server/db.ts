@@ -42,9 +42,19 @@ let _supabase: SupabaseClient | null = null;
 let _supabaseAdmin: SupabaseClient | null = null;
 
 export function getSupabase() {
-  if (!_supabase && supabaseUrl && supabaseAnonKey) {
+  if (!_supabase) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[Database] Supabase credentials missing!', {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseAnonKey,
+        url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'missing',
+      });
+      return null;
+    }
     _supabase = createClient(supabaseUrl, supabaseAnonKey);
-    console.log('[Database] Supabase client initialized');
+    console.log('[Database] Supabase client initialized', {
+      url: supabaseUrl.substring(0, 30) + '...',
+    });
   }
   return _supabase;
 }
@@ -1581,15 +1591,29 @@ export async function getUsersByCompany(companyId: string): Promise<User[]> {
  */
 export async function getUserByEmail(email: string): Promise<User | null> {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error('[Database] getUserByEmail: Supabase client not available');
+    return null;
+  }
 
+  console.log('[Database] getUserByEmail: Querying for email:', email);
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('email', email)
     .single();
 
-  if (error) return null;
+  if (error) {
+    console.error('[Database] getUserByEmail error:', error);
+    return null;
+  }
+  
+  if (!data) {
+    console.log('[Database] getUserByEmail: No user found for email:', email);
+    return null;
+  }
+  
+  console.log('[Database] getUserByEmail: Found user:', data.id, data.email);
   return toCamelCase(data) as User;
 }
 
