@@ -109,6 +109,14 @@ export default function WorkJournal() {
           { yearMonth: selectedYearMonth },
           { enabled: currentTab === 'monthly' }
         )
+      : user?.role === 'bp'
+      ? trpc.workJournal.monthlyReportByBp.useQuery(
+          {
+            yearMonth: selectedYearMonth,
+            ownerId: selectedOwner === 'all' ? undefined : selectedOwner
+          },
+          { enabled: currentTab === 'monthly' }
+        )
       : user?.role === 'ep' || user?.role === 'admin'
       ? trpc.workJournal.monthlyReportByEp.useQuery(
           {
@@ -430,13 +438,25 @@ export default function WorkJournal() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {isOwner ? "작업 확인서 목록" : isEP ? "작업 확인서 목록" : "승인 대기 중인 작업 확인서"}
+            {isOwner ? "작업 확인서" : isEP ? "작업 확인서" : "작업 확인서 승인"}
           </CardTitle>
           <CardDescription>
-            총 {pendingJournals?.length || 0}건의 작업 확인서{isOwner || isEP ? "가 있습니다" : "가 승인 대기 중입니다"}.
+            일별 목록 또는 월별 정리표로 확인할 수 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <Tabs value={currentTab} onValueChange={setCurrentTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="daily">
+                📋 일별 목록 ({pendingJournals?.length || 0}건)
+              </TabsTrigger>
+              <TabsTrigger value="monthly">
+                📊 월별 정리표
+              </TabsTrigger>
+            </TabsList>
+
+            {/* 일별 목록 탭 */}
+            <TabsContent value="daily" className="mt-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -507,6 +527,159 @@ export default function WorkJournal() {
               <p className="text-muted-foreground">승인 대기 중인 작업 확인서가 없습니다.</p>
             </div>
           )}
+            </TabsContent>
+
+            {/* 월별 정리표 탭 */}
+            <TabsContent value="monthly" className="mt-0">
+              <div className="space-y-4">
+                {/* 월 선택 */}
+                <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                  <Label htmlFor="year-month" className="font-semibold">조회 기간:</Label>
+                  <Input
+                    id="year-month"
+                    type="month"
+                    value={selectedYearMonth}
+                    onChange={(e) => setSelectedYearMonth(e.target.value)}
+                    className="w-[200px]"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {selectedYearMonth && format(new Date(selectedYearMonth + '-01'), 'yyyy년 MM월', { locale: ko })} 작업 정리표
+                  </span>
+                </div>
+
+                {/* 월별 정리표 */}
+                {monthlyReport && monthlyReport.length > 0 ? (
+                  <div className="space-y-6">
+                    {monthlyReport.map((report: any) => (
+                      <Card key={report.deploymentId} className="overflow-hidden">
+                        <CardHeader className="bg-blue-50">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-lg">
+                                {report.siteName || '현장명 미등록'}
+                              </CardTitle>
+                              <Badge variant="outline" className="text-sm">
+                                {report.equipmentRegNum || '-'}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">장비:</span>{' '}
+                                <span className="font-medium">{report.equipmentName || '-'} {report.specification && `(${report.specification})`}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">운전자:</span>{' '}
+                                <span className="font-medium">{report.workerName || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">작업일수:</span>{' '}
+                                <span className="font-medium text-blue-600">{report.workDays?.length || 0}일</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-gray-50">
+                                  <TableHead className="text-center w-[100px]">날짜</TableHead>
+                                  <TableHead className="min-w-[200px]">작업내용</TableHead>
+                                  <TableHead className="text-center w-[80px]">조출</TableHead>
+                                  <TableHead className="text-center w-[80px]">점심OT</TableHead>
+                                  <TableHead className="text-center w-[80px]">연장</TableHead>
+                                  <TableHead className="text-center w-[80px]">철야</TableHead>
+                                  <TableHead className="text-center w-[100px]">확인</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {report.workDays && report.workDays.length > 0 ? (
+                                  report.workDays.map((day: any, idx: number) => (
+                                    <TableRow key={idx}>
+                                      <TableCell className="text-center font-medium">
+                                        {day.date && format(new Date(day.date), 'MM/dd (E)', { locale: ko })}
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        {day.workContent || '-'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {day.earlyStart ? '○' : '-'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {day.lunchOt > 0 ? `${day.lunchOt}h` : '-'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {day.otHours > 0 ? `${day.otHours}h` : '-'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {day.nightHours > 0 ? `${day.nightHours}h` : '-'}
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {day.bpApproved ? (
+                                          <Badge variant="default" className="bg-green-100 text-green-700">
+                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                            승인
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="secondary">대기</Badge>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
+                                ) : (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                      해당 월에 작업 기록이 없습니다
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                        <CardContent className="bg-gray-50 border-t">
+                          <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">총 작업일:</span>{' '}
+                              <span className="font-bold text-lg">{report.workDays?.length || 0}</span>일
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">총 연장:</span>{' '}
+                              <span className="font-bold text-lg text-orange-600">
+                                {report.workDays?.reduce((sum: number, d: any) => sum + (d.otHours || 0), 0) || 0}
+                              </span>h
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">총 철야:</span>{' '}
+                              <span className="font-bold text-lg text-purple-600">
+                                {report.workDays?.reduce((sum: number, d: any) => sum + (d.nightHours || 0), 0) || 0}
+                              </span>h
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">승인 완료:</span>{' '}
+                              <span className="font-bold text-lg text-green-600">
+                                {report.workDays?.filter((d: any) => d.bpApproved).length || 0}
+                              </span>/{report.workDays?.length || 0}일
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground mb-2">
+                      선택한 기간에 작업 기록이 없습니다
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      다른 기간을 선택하거나 일별 목록을 확인해주세요
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

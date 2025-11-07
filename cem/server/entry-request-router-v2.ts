@@ -107,10 +107,10 @@ export const entryRequestsRouterV2 = router({
           bpCompanyName = bpCompany?.name || '-';
         }
 
-        // 아이템 개수 조회
+        // 아이템 전체 조회 (투입 관리에서 item_id가 필요함)
         const { data: items } = await supabase
           .from('entry_request_items')
-          .select('item_type')
+          .select('item_type, item_id')
           .eq('entry_request_id', request.id);
 
         const equipmentCount = items?.filter((i: any) => i.item_type === 'equipment').length || 0;
@@ -122,6 +122,7 @@ export const entryRequestsRouterV2 = router({
           bpCompanyName,
           equipmentCount,
           workerCount,
+          items: items || [], // items 배열 포함
         };
       })
     );
@@ -1047,6 +1048,59 @@ export const entryRequestsRouterV2 = router({
         items: allItems,  // 프론트엔드가 기대하는 필드명
         equipment: equipmentResults,  // 하위 호환성 유지
         workers: workerResults,        // 하위 호환성 유지
+      };
+    }),
+
+  /**
+   * 장비의 승인된 작업계획서 조회 (안전점검원용)
+   */
+  getWorkPlanByEquipment: protectedProcedure
+    .input(z.object({
+      equipmentId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const supabase = db.getSupabase();
+      if (!supabase) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database connection failed",
+        });
+      }
+
+      // 이 장비가 포함된 entry_request_items 찾기
+      const { data: items, error: itemsError } = await supabase
+        .from('entry_request_items')
+        .select('entry_request_id')
+        .eq('item_id', input.equipmentId)
+        .eq('item_type', 'equipment');
+
+      if (itemsError || !items || items.length === 0) {
+        return null;
+      }
+
+      const entryRequestIds = items.map((item: any) => item.entry_request_id);
+
+      // 이 중 승인된(bp_approved 또는 ep_approved) 요청 찾기
+      const { data: approvedRequests, error: requestsError } = await supabase
+        .from('entry_requests')
+        .select('id, bp_work_plan_url, status, request_number, created_at')
+        .in('id', entryRequestIds)
+        .in('status', ['bp_approved', 'ep_approved'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (requestsError || !approvedRequests || approvedRequests.length === 0) {
+        return null;
+      }
+
+      const request = approvedRequests[0];
+
+      return {
+        id: request.id,
+        requestNumber: request.request_number,
+        status: request.status,
+        workPlanUrl: request.bp_work_plan_url,
+        hasWorkPlan: !!request.bp_work_plan_url,
       };
     }),
 });

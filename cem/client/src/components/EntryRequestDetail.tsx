@@ -286,6 +286,47 @@ export function EntryRequestDetail({
     }
   };
 
+  // 전체 서류를 브라우저에서 보기
+  const handleViewAllPdf = async () => {
+    if (!requestData.id) {
+      toast.error("반입 요청 ID가 없습니다.");
+      return;
+    }
+
+    try {
+      toast.loading("PDF 생성 중... 잠시만 기다려주세요.");
+
+      const result = await downloadPdfMutation.mutateAsync({
+        entryRequestId: requestData.id,
+      });
+
+      if (result.success && result.pdfBase64) {
+        // Base64를 Blob으로 변환
+        const byteCharacters = atob(result.pdfBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: result.mimeType });
+
+        // 새 탭에서 열기
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+
+        toast.dismiss();
+        toast.success("PDF를 새 탭에서 열었습니다.");
+
+        // 5초 후 URL 해제 (메모리 절약)
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+    } catch (error: any) {
+      console.error("[EntryRequestDetail] PDF view failed:", error);
+      toast.dismiss();
+      toast.error(error.message || "PDF 보기에 실패했습니다.");
+    }
+  };
+
   // 전체 서류를 PDF로 다운로드
   const handleDownloadAllPdf = async () => {
     if (!requestData.id) {
@@ -753,17 +794,29 @@ export function EntryRequestDetail({
             )}
           </div>
 
-          <DialogFooter className="flex justify-between items-center">
-            <Button
-              variant="outline"
-              onClick={handleDownloadAllPdf}
-              disabled={downloadPdfMutation.isPending}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {downloadPdfMutation.isPending ? "PDF 생성 중..." : "전체 PDF 다운로드"}
-            </Button>
+          <DialogFooter className="flex flex-wrap justify-between items-center gap-2">
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleViewAllPdf}
+                disabled={downloadPdfMutation.isPending}
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                {downloadPdfMutation.isPending ? "생성 중..." : "전체 보기"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadAllPdf}
+                disabled={downloadPdfMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                {downloadPdfMutation.isPending ? "생성 중..." : "다운로드"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>
                 닫기
               </Button>
 
@@ -772,26 +825,28 @@ export function EntryRequestDetail({
                 <>
                   <Button
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowRejectDialog(true)}
                     disabled={bpApproveMutation.isPending || isUploading}
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-1" />
                     반려
                   </Button>
                   <Button
+                    size="sm"
                     onClick={handleBpApprove}
                     disabled={bpApproveMutation.isPending || isUploading}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     {bpApproveMutation.isPending || isUploading ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isUploading ? "파일 업로드 중..." : "처리 중..."}
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        {isUploading ? "업로드 중..." : "처리 중..."}
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        승인 및 EP에 전달
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        승인 및 EP 전달
                       </>
                     )}
                   </Button>
@@ -803,13 +858,14 @@ export function EntryRequestDetail({
                 <>
                   <Button
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowRejectDialog(true)}
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-1" />
                     반려
                   </Button>
-                  <Button onClick={handleApprove}>
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                  <Button size="sm" onClick={handleApprove}>
+                    <CheckCircle className="h-4 w-4 mr-1" />
                     승인
                   </Button>
                 </>
@@ -820,16 +876,18 @@ export function EntryRequestDetail({
                 <>
                   <Button
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowRejectDialog(true)}
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-1" />
                     반려
                   </Button>
                   <Button
+                    size="sm"
                     onClick={handleApprove}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-1" />
                     최종 승인
                   </Button>
                 </>

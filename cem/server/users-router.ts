@@ -34,7 +34,7 @@ export const usersRouter = router({
         name: z.string().min(1, "이름을 입력해주세요."),
         email: z.string().email("올바른 이메일을 입력해주세요."),
         password: z.string().min(6, "비밀번호는 최소 6자 이상이어야 합니다."),
-        role: z.enum(["admin", "owner", "bp", "ep", "worker", "inspector"]),
+        role: z.enum(["admin", "owner", "bp", "ep", "inspector"]),
         companyId: z.string().optional(),
         pin: z.string().length(4, "PIN은 4자리여야 합니다.").optional(),
       })
@@ -99,7 +99,7 @@ export const usersRouter = router({
         password: hashedPassword, // 해싱된 비밀번호 저장
         role: input.role,
         company_id: input.companyId || null,
-        pin: input.pin || null,
+        pin: input.pin || null, // Inspector용 PIN
         created_at: new Date().toISOString(),
       });
 
@@ -114,32 +114,6 @@ export const usersRouter = router({
       }
 
       console.log(`[Users] Created: ${input.email} (${input.role})`);
-
-      // Worker role인 경우 workers 테이블에도 추가
-      if (input.role === "worker" || input.role === "inspector") {
-        console.log(`[Users] Creating worker entry for: ${input.email}`);
-
-        const { nanoid } = await import("nanoid");
-        const workerId = nanoid();
-
-        const { error: workerError } = await supabase.from("workers").insert({
-          id: workerId,
-          name: input.name,
-          email: input.email,
-          pin_code: input.pin || null,
-          user_id: userId, // users 테이블과 연결
-          company_id: input.companyId || null,
-          created_at: new Date().toISOString(),
-        });
-
-        if (workerError) {
-          console.error("[Users] Worker insert error:", workerError);
-          // Worker 생성 실패해도 User는 유지 (나중에 수동으로 연결 가능)
-          console.warn("[Users] User created but worker creation failed. User can be linked manually later.");
-        } else {
-          console.log(`[Users] Worker created: ${workerId}`);
-        }
-      }
 
       return { id: userId, success: true };
     }),

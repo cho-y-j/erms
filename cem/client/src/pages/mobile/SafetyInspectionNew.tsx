@@ -59,6 +59,12 @@ export default function SafetyInspectionNew() {
 
   const equipment = equipmentList?.[0];
 
+  // 작업계획서 조회
+  const { data: workPlan } = trpc.entryRequestsV2.getWorkPlanByEquipment.useQuery(
+    { equipmentId: equipment?.id || "" },
+    { enabled: !!equipment?.id }
+  );
+
   // 적용 가능한 템플릿 조회
   const { data: templates, isLoading: templatesLoading } = trpc.safetyInspection.getApplicableTemplates.useQuery(
     { equipmentId: equipmentId!, inspectorType: "inspector" },
@@ -136,6 +142,15 @@ export default function SafetyInspectionNew() {
       setSelectedTemplateId(templates[0].id);
     }
   }, [templates, selectedTemplateId]);
+
+  // 작업계획서 보기
+  const handleViewWorkPlan = () => {
+    if (workPlan?.workPlanUrl) {
+      window.open(workPlan.workPlanUrl, '_blank');
+    } else {
+      toast.error("작업계획서를 찾을 수 없습니다.");
+    }
+  };
 
   // 필터링된 항목들
   const filteredItems = template?.items?.filter(
@@ -328,15 +343,29 @@ export default function SafetyInspectionNew() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">차량번호</span>
-                <span className="font-medium">{equipment?.regNum || "-"}</span>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">차량번호</span>
+                  <span className="font-medium">{equipment?.regNum || "-"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">장비 종류</span>
+                  <span className="font-medium">{equipment?.equipType?.name || "-"}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">장비 종류</span>
-                <span className="font-medium">{equipment?.equipType?.name || "-"}</span>
-              </div>
+
+              {/* 작업계획서 보기 버튼 */}
+              {workPlan?.hasWorkPlan && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleViewWorkPlan}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  작업계획서 보기
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

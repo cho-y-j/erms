@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Plus, Loader2, UserPlus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -40,10 +41,11 @@ export default function AdminUsersNew() {
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<string>("all"); // 역할별 필터 탭
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"owner" | "bp" | "ep" | "worker" | "inspector">("owner");
+  const [role, setRole] = useState<"admin" | "owner" | "bp" | "ep" | "inspector">("owner");
   const [companyId, setCompanyId] = useState("");
   const [pin, setPin] = useState("0000"); // Inspector/Worker용 PIN
 
@@ -152,13 +154,13 @@ export default function AdminUsersNew() {
       return;
     }
 
-    // Inspector/Worker는 PIN 필수
-    if ((role === "inspector" || role === "worker") && !pin.trim()) {
+    // Inspector는 PIN 필수
+    if (role === "inspector" && !pin.trim()) {
       toast.error("PIN 번호를 입력해주세요.");
       return;
     }
 
-    if ((role === "inspector" || role === "worker") && pin.length !== 4) {
+    if (role === "inspector" && pin.length !== 4) {
       toast.error("PIN은 4자리 숫자여야 합니다.");
       return;
     }
@@ -172,7 +174,7 @@ export default function AdminUsersNew() {
         password: password || undefined, // 비밀번호가 있으면 변경
         role,
         companyId: companyId || undefined,
-        pin: (role === "inspector" || role === "worker") ? pin : undefined,
+        pin: role === "inspector" ? pin : undefined,
       });
     } else {
       // 생성
@@ -182,7 +184,7 @@ export default function AdminUsersNew() {
         password,
         role,
         companyId: companyId || undefined,
-        pin: (role === "inspector" || role === "worker") ? pin : undefined,
+        pin: role === "inspector" ? pin : undefined,
       });
     }
   };
@@ -230,6 +232,17 @@ export default function AdminUsersNew() {
   console.log('[UsersNew] Companies:', companies);
   console.log('[UsersNew] Current role:', role);
   console.log('[UsersNew] Filtered companies:', filteredCompanies);
+
+  // 역할별로 필터링된 사용자 목록
+  const filteredUsers = selectedTab === "all"
+    ? users
+    : users?.filter((user: any) => user.role === selectedTab);
+
+  // 역할별 카운트
+  const getRoleCount = (roleFilter: string) => {
+    if (roleFilter === "all") return users?.length || 0;
+    return users?.filter((user: any) => user.role === roleFilter).length || 0;
+  };
 
   return (
     <div className="space-y-6">
@@ -288,16 +301,19 @@ export default function AdminUsersNew() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="admin">시스템 관리자 (Admin)</SelectItem>
                     <SelectItem value="owner">장비임대사업자 (Owner)</SelectItem>
                     <SelectItem value="bp">협력사 (BP)</SelectItem>
                     <SelectItem value="ep">시행사 (EP)</SelectItem>
-                    <SelectItem value="worker">운전자</SelectItem>
-                    <SelectItem value="inspector">안전점검원</SelectItem>
+                    <SelectItem value="inspector">안전점검원 (Inspector)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-sm text-muted-foreground mt-2">
+                  ℹ️ 운전자(Worker)는 Owner의 "인력 관리"에서 등록하세요.
+                </p>
               </div>
 
-              {(role === "inspector" || role === "worker") && (
+              {role === "inspector" && (
                 <div>
                   <Label htmlFor="pin">PIN 번호 (4자리) *</Label>
                   <Input
@@ -390,90 +406,120 @@ export default function AdminUsersNew() {
           <CardTitle>사용자 목록</CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingUsers ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : users && users.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이름</TableHead>
-                  <TableHead>이메일</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>소속 회사</TableHead>
-                  <TableHead>가입일</TableHead>
-                  <TableHead className="text-right">작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user: any) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name || "-"}</TableCell>
-                    <TableCell>{user.email || "-"}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={user.role}
-                        onValueChange={(value) =>
-                          updateRoleMutation.mutate({
-                            userId: user.id,
-                            role: value as any,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-48">
-                          <SelectValue>
-                            <Badge variant={getRoleBadgeVariant(user.role)}>
-                              {getRoleLabel(user.role)}
-                            </Badge>
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">관리자</SelectItem>
-                          <SelectItem value="owner">장비임대사업자</SelectItem>
-                          <SelectItem value="bp">협력사</SelectItem>
-                          <SelectItem value="ep">시행사</SelectItem>
-                          <SelectItem value="worker">운전자</SelectItem>
-                          <SelectItem value="inspector">안전점검원</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>{getCompanyName(user.companyId)}</TableCell>
-                    <TableCell>
-                      {user.createdAt
-                        ? new Date(user.createdAt).toLocaleDateString("ko-KR")
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(user)}
-                          title="수정"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(user.id, user.name)}
-                          disabled={deleteMutation.isPending}
-                          title="삭제"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              사용자가 없습니다.
-            </div>
-          )}
+          <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="all">
+                전체 ({getRoleCount("all")})
+              </TabsTrigger>
+              <TabsTrigger value="admin">
+                관리자 ({getRoleCount("admin")})
+              </TabsTrigger>
+              <TabsTrigger value="owner">
+                Owner ({getRoleCount("owner")})
+              </TabsTrigger>
+              <TabsTrigger value="bp">
+                BP ({getRoleCount("bp")})
+              </TabsTrigger>
+              <TabsTrigger value="ep">
+                EP ({getRoleCount("ep")})
+              </TabsTrigger>
+              <TabsTrigger value="worker">
+                운전자 ({getRoleCount("worker")})
+              </TabsTrigger>
+              <TabsTrigger value="inspector">
+                점검원 ({getRoleCount("inspector")})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={selectedTab} className="mt-6">
+              {loadingUsers ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : filteredUsers && filteredUsers.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이름</TableHead>
+                      <TableHead>이메일</TableHead>
+                      <TableHead>역할</TableHead>
+                      <TableHead>소속 회사</TableHead>
+                      <TableHead>가입일</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user: any) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name || "-"}</TableCell>
+                        <TableCell>{user.email || "-"}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(value) =>
+                              updateRoleMutation.mutate({
+                                userId: user.id,
+                                role: value as any,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-48">
+                              <SelectValue>
+                                <Badge variant={getRoleBadgeVariant(user.role)}>
+                                  {getRoleLabel(user.role)}
+                                </Badge>
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">관리자</SelectItem>
+                              <SelectItem value="owner">장비임대사업자</SelectItem>
+                              <SelectItem value="bp">협력사</SelectItem>
+                              <SelectItem value="ep">시행사</SelectItem>
+                              <SelectItem value="worker">운전자</SelectItem>
+                              <SelectItem value="inspector">안전점검원</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{getCompanyName(user.companyId)}</TableCell>
+                        <TableCell>
+                          {user.createdAt
+                            ? new Date(user.createdAt).toLocaleDateString("ko-KR")
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(user)}
+                              title="수정"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(user.id, user.name)}
+                              disabled={deleteMutation.isPending}
+                              title="삭제"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {selectedTab === "all"
+                    ? "사용자가 없습니다."
+                    : `${getRoleLabel(selectedTab)} 역할의 사용자가 없습니다.`}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

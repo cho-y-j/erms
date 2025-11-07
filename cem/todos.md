@@ -1,13 +1,98 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-05  
-**프로젝트**: Equipment and Resource Management System (ERMS)  
-**Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY  
+**마지막 업데이트**: 2025-11-07
+**프로젝트**: Equipment and Resource Management System (ERMS)
+**Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
 **현재 단계**: 🧪 **테스트 및 UI 개선 단계**
 
 ---
 
-## 🎉 오늘 완료한 작업 (2025-11-05)
+## 🎉 오늘 완료한 작업 (2025-11-07)
+
+### ✅ 반입 요청 전체 보기 기능 추가
+
+**구현 내용:**
+- ✅ `client/src/components/EntryRequestDetail.tsx`: "전체 보기" 버튼 추가
+- ✅ PDF를 다운로드 없이 브라우저 새 탭에서 직접 볼 수 있는 기능
+- ✅ Base64 PDF를 Blob으로 변환하여 window.open()으로 표시
+- ✅ 모바일 Inspector도 작업계획서를 브라우저에서 볼 수 있도록 개선
+
+### ✅ UI 개선: EP 승인 화면 버튼 크기 조정
+
+**문제점:**
+- EP 승인 화면에서 버튼이 길어서 좌우 스크롤 발생
+
+**해결:**
+- ✅ 모든 버튼에 `size="sm"` 적용
+- ✅ 버튼 텍스트 간결화 ("전체 PDF 다운로드" → "다운로드")
+- ✅ 아이콘 여백 축소 (mr-2 → mr-1)
+- ✅ DialogFooter에 flex-wrap 추가
+
+### ✅ 투입 관리 개선 (근본 문제 해결)
+
+**발견된 문제:**
+- 투입 등록에서 EP 승인된 장비/인력이 표시되지 않음
+- 반복적으로 같은 문제 발생
+
+**근본 원인:**
+- `entryRequestsV2.list` API가 items 배열을 반환하지 않음
+- list는 items 개수만 조회하고, getById만 items를 포함
+
+**해결:**
+- ✅ `server/entry-request-router-v2.ts`: list API에서 items 배열 포함하도록 수정
+- ✅ 반입 요청 선택 필드 제거 (자동 처리)
+- ✅ EP 승인된 모든 장비/인력 자동 표시
+- ✅ 장비 선택 시 해당 장비의 반입 요청 ID 자동 설정
+- ✅ 운전자 선택 시 장비 선택 유지 (초기화 안 됨)
+
+### ✅ 작업 확인서 문제 해결
+
+**발견된 문제:**
+- Worker 로그인 후 "투입된 현장이 없다"고 표시
+- 실제로는 Deployment가 존재함
+
+**근본 원인:**
+- Deployment의 Worker는 송치봉(OZiZ6YvzB6a3d3nul2QJ8)인데 user_id가 null
+- 로그인한 계정(shb@test.com)과 Worker의 user_id가 연결되지 않음
+
+**해결:**
+- ✅ 송치봉 Worker에 user_id 연결 (`vTlN5l45q9hl-0QQvCC_g`)
+- ✅ `server/db.ts`: getDeploymentsByUserId에 디버깅 로그 추가
+
+### ✅ 작업 확인서 월별 정리표 추가
+
+**요구사항:**
+- BP에서 승인 완료된 작업을 월별로 정리해서 볼 수 있어야 함
+- 임대사업자별, 차량별, 운전자별 필터링
+- 월별 조회 (예: 9/25 ~ 10/25)
+
+**구현 내용:**
+- ✅ `client/src/pages/WorkJournal.tsx`: 일별 목록 / 월별 정리표 탭 추가
+- ✅ 월 선택기 (YYYY-MM 형식)
+- ✅ Deployment별로 그룹화하여 카드 형식으로 표시:
+  - 공사명, 장비번호/규격, 운전자명
+  - 날짜별 작업내용, 조출, 점심OT, 연장, 철야, 확인(BP 승인)
+  - 총 작업일, 총 연장, 총 철야, 승인 완료 비율
+- ✅ `server/work-journal-router.ts`: BP용 월별 리포트 API 추가
+- ✅ Owner/EP API도 Deployment별 그룹화 형식으로 수정
+
+**테스트 완료:**
+- ✅ BP 로그인 → 작업 확인서 승인 → 월별 정리표 탭
+- ✅ Owner별 필터링 작동
+- ✅ 월 선택 시 해당 월 데이터 조회
+
+**관련 파일:**
+- `client/src/components/EntryRequestDetail.tsx`
+- `client/src/pages/Deployments.tsx`
+- `client/src/pages/WorkJournal.tsx`
+- `client/src/pages/mobile/SafetyInspectionNew.tsx`
+- `server/entry-request-router-v2.ts`
+- `server/work-journal-router.ts`
+- `server/db.ts`
+
+---
+
+## 🎉 이전 완료 작업 (2025-11-05)
 
 ### ✅ Worker 이메일 로그인 시스템 완성
 
@@ -870,27 +955,35 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 
 ## 📝 작업 요약
 
-### 오늘 완료 (2025-11-05)
+### 오늘 완료 (2025-11-07)
+- ✅ 반입 요청 전체 보기 기능 (PDF 브라우저에서 직접 보기)
+- ✅ EP 승인 화면 버튼 크기 조정
+- ✅ 투입 관리 근본 문제 해결 (entry_requests.list에 items 포함)
+- ✅ Worker user_id 연결 문제 해결
+- ✅ 작업 확인서 월별 정리표 추가 (BP/Owner/EP용)
+
+### 이전 완료 (2025-11-05)
 - ✅ Worker 이메일 로그인 시스템 완성
 - ✅ 비밀번호 해싱 구현
 - ✅ Workers 테이블에 email 컬럼 추가 (MCP)
 - ✅ Worker 등록/수정 API 개선
-- ✅ 로그인 테스트 성공
 
-### 내일 작업 (2025-11-06)
-- 🎯 **역할별 기능 테스트** (Owner, BP, EP, Admin, Worker, Inspector)
-- 🎨 **UI/UX 개선** (발견된 문제 즉시 수정)
-- 📋 **End-to-End 시나리오 테스트**
+### 다음 작업 계획
+- 🎯 **작업 확인서 작성 및 승인 테스트** (Worker → BP → 월별 정리표)
+- 🎯 **반입 요청 → 투입 등록 → 작업 확인서 전체 워크플로우 테스트**
+- 🎨 **추가 UI/UX 개선** (사용자 피드백 반영)
+- 📋 **모바일 Inspector 기능 테스트**
 
 ### 이후 우선순위
 1. RLS (Row Level Security) 활성화
-2. 성능 최적화 및 무한 로딩 문제 해결
+2. 성능 최적화
 3. 보안 강화
 4. 프로덕션 배포 준비
 
 ---
 
-**마지막 업데이트**: 2025-11-05  
-**다음 작업**: 역할별 기능 테스트 및 UI 개선  
+**마지막 업데이트**: 2025-11-07
+**다음 작업**: 작업 확인서 및 월별 정리표 테스트
 **Supabase MCP**: ✅ 연결됨 및 사용 가능
+**오늘 작업 종료**: 오늘은 여기까지 작업 완료 🎉
 

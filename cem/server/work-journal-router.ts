@@ -319,35 +319,116 @@ export const workJournalRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      // TODO: 월별 리포트 집계 로직 구현
-      // 현재는 해당 월의 모든 작업확인서를 조회하여 집계
       const startDate = `${input.yearMonth}-01`;
       const endDate = `${input.yearMonth}-31`;
 
       const journals = await db.getWorkJournalsByOwnerId(ctx.user.id, {
-        status: "bp_approved", // 승인된 것만
+        status: undefined, // 모든 상태
         startDate,
         endDate,
       });
 
-      // 집계 계산
-      const totalDays = journals.length;
-      const totalRegular = journals.reduce((sum, j) => sum + (Number(j.regularHours) || 0), 0);
-      const totalOt = journals.reduce((sum, j) => sum + (Number(j.otHours) || 0), 0);
-      const totalNight = journals.reduce((sum, j) => sum + (Number(j.nightHours) || 0), 0);
+      // Deployment별로 그룹화
+      const grouped = journals.reduce((acc: any, j) => {
+        const depId = j.deploymentId || 'unknown';
+        if (!acc[depId]) {
+          acc[depId] = {
+            deploymentId: depId,
+            siteName: j.siteName,
+            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
+            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
+            specification: j.specification || j.equipment?.specification,
+            workerName: j.workerName || j.worker?.name,
+            workDays: [],
+          };
+        }
+        acc[depId].workDays.push({
+          date: j.workDate,
+          workContent: j.workContent,
+          earlyStart: j.startTime && j.startTime < '08:00',
+          lunchOt: 0, // TODO: 점심 OT 계산 로직 추가
+          otHours: j.otHours || 0,
+          nightHours: j.nightHours || 0,
+          bpApproved: j.status === 'bp_approved',
+          signatureData: j.signatureData,
+          signerName: j.signerName,
+        });
+        return acc;
+      }, {});
 
-      return {
-        yearMonth: input.yearMonth,
-        totalDays,
-        totalRegularHours: totalRegular,
-        totalOtHours: totalOt,
-        totalNightHours: totalNight,
-        journals, // 상세 내역
-      };
+      // 날짜순 정렬
+      const result = Object.values(grouped).map((dep: any) => ({
+        ...dep,
+        workDays: dep.workDays.sort((a: any, b: any) =>
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ),
+      }));
+
+      return result;
     }),
 
   /**
-   * 월별 작업 리포트 조회 (EP용, BP사별)
+   * 월별 작업 리포트 조회 (BP용, Deployment별 그룹화)
+   */
+  monthlyReportByBp: protectedProcedure
+    .input(
+      z.object({
+        yearMonth: z.string(), // 'YYYY-MM' format
+        ownerId: z.string().optional(), // Owner 선택 (선택사항)
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const startDate = `${input.yearMonth}-01`;
+      const endDate = `${input.yearMonth}-31`;
+
+      const journals = await db.getWorkJournalsByBpCompanyId(ctx.user.companyId, {
+        status: undefined, // 모든 상태
+        startDate,
+        endDate,
+        ownerId: input.ownerId,
+      });
+
+      // Deployment별로 그룹화
+      const grouped = journals.reduce((acc: any, j) => {
+        const depId = j.deploymentId || 'unknown';
+        if (!acc[depId]) {
+          acc[depId] = {
+            deploymentId: depId,
+            siteName: j.siteName,
+            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
+            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
+            specification: j.specification || j.equipment?.specification,
+            workerName: j.workerName || j.worker?.name,
+            workDays: [],
+          };
+        }
+        acc[depId].workDays.push({
+          date: j.workDate,
+          workContent: j.workContent,
+          earlyStart: j.startTime && j.startTime < '08:00',
+          lunchOt: 0, // TODO: 점심 OT 계산 로직 추가
+          otHours: j.otHours || 0,
+          nightHours: j.nightHours || 0,
+          bpApproved: j.status === 'bp_approved',
+          signatureData: j.signatureData,
+          signerName: j.signerName,
+        });
+        return acc;
+      }, {});
+
+      // 날짜순 정렬
+      const result = Object.values(grouped).map((dep: any) => ({
+        ...dep,
+        workDays: dep.workDays.sort((a: any, b: any) =>
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ),
+      }));
+
+      return result;
+    }),
+
+  /**
+   * 월별 작업 리포트 조회 (EP용, Deployment별 그룹화)
    */
   monthlyReportByEp: protectedProcedure
     .input(
@@ -362,45 +443,48 @@ export const workJournalRouter = router({
 
       const journals = await db.getWorkJournals({
         bpCompanyId: input.bpCompanyId,
-        status: "bp_approved",
+        status: undefined, // 모든 상태
         startDate,
         endDate,
       });
 
-      // 집계 계산
-      const totalDays = journals.length;
-      const totalRegular = journals.reduce((sum, j) => sum + (Number(j.regularHours) || 0), 0);
-      const totalOt = journals.reduce((sum, j) => sum + (Number(j.otHours) || 0), 0);
-      const totalNight = journals.reduce((sum, j) => sum + (Number(j.nightHours) || 0), 0);
-
-      // BP사별로 그룹화
-      const byBpCompany = journals.reduce((acc: any, j) => {
-        const bpId = j.bpCompanyId || 'unknown';
-        if (!acc[bpId]) {
-          acc[bpId] = {
-            bpCompanyId: bpId,
-            bpCompanyName: j.bpCompany?.name || '알 수 없음',
-            count: 0,
-            totalRegular: 0,
-            totalOt: 0,
-            totalNight: 0,
+      // Deployment별로 그룹화
+      const grouped = journals.reduce((acc: any, j) => {
+        const depId = j.deploymentId || 'unknown';
+        if (!acc[depId]) {
+          acc[depId] = {
+            deploymentId: depId,
+            siteName: j.siteName,
+            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
+            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
+            specification: j.specification || j.equipment?.specification,
+            workerName: j.workerName || j.worker?.name,
+            bpCompanyName: j.bpCompany?.name,
+            workDays: [],
           };
         }
-        acc[bpId].count++;
-        acc[bpId].totalRegular += Number(j.regularHours) || 0;
-        acc[bpId].totalOt += Number(j.otHours) || 0;
-        acc[bpId].totalNight += Number(j.nightHours) || 0;
+        acc[depId].workDays.push({
+          date: j.workDate,
+          workContent: j.workContent,
+          earlyStart: j.startTime && j.startTime < '08:00',
+          lunchOt: 0, // TODO: 점심 OT 계산 로직 추가
+          otHours: j.otHours || 0,
+          nightHours: j.nightHours || 0,
+          bpApproved: j.status === 'bp_approved',
+          signatureData: j.signatureData,
+          signerName: j.signerName,
+        });
         return acc;
       }, {});
 
-      return {
-        yearMonth: input.yearMonth,
-        totalDays,
-        totalRegularHours: totalRegular,
-        totalOtHours: totalOt,
-        totalNightHours: totalNight,
-        byBpCompany: Object.values(byBpCompany),
-        journals,
-      };
+      // 날짜순 정렬
+      const result = Object.values(grouped).map((dep: any) => ({
+        ...dep,
+        workDays: dep.workDays.sort((a: any, b: any) =>
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ),
+      }));
+
+      return result;
     }),
 });

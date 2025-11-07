@@ -1887,16 +1887,29 @@ export async function getDeploymentsByUserId(userId: string, filters?: {
   if (!supabase) return [];
 
   // 1. user_id로 worker 레코드 찾기
+  console.log('[getDeploymentsByUserId] 🔍 Searching worker for user_id:', userId);
+
   const { data: workerData, error: workerError } = await supabase
     .from('workers')
-    .select('id')
+    .select('id, name, user_id')
     .eq('user_id', userId)
     .single();
 
   if (workerError || !workerData) {
-    console.log("[Database] No worker found for user:", userId);
+    console.log("[getDeploymentsByUserId] ❌ No worker found for user_id:", userId);
+    console.log("[getDeploymentsByUserId] Error:", workerError);
+
+    // 전체 workers 확인 (디버깅용)
+    const { data: allWorkers } = await supabase
+      .from('workers')
+      .select('id, name, user_id')
+      .limit(10);
+    console.log("[getDeploymentsByUserId] 📋 Sample workers (first 10):", allWorkers);
+
     return [];
   }
+
+  console.log('[getDeploymentsByUserId] ✅ Found worker:', workerData);
 
   // 2. worker_id로 deployments 조회 (join 포함)
   let query = supabase

@@ -200,7 +200,7 @@ export default function EntryRequestsNew() {
   const cancelMutation = trpc.entryRequestsV2.cancel.useMutation({
     onSuccess: () => {
       toast.success("반입 요청이 취소되었습니다.");
-      utils.entryRequests.list.invalidate();
+      utils.entryRequestsV2.list.invalidate();
       setRejectDialogOpen(false);
       setRejectReason("");
     },

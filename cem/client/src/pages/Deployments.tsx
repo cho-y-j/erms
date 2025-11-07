@@ -85,48 +85,64 @@ export default function Deployments() {
   const { data: equipment } = trpc.equipment.list.useQuery();
   const { data: workers } = trpc.workers.list.useQuery();
   const { data: bpCompanies } = trpc.companies.list.useQuery({ companyType: 'bp' });
-  
-  // 선택된 반입 요청의 상세 정보 조회 (장비/인력 목록 포함)
-  const { data: selectedEntryRequest } = trpc.entryRequestsV2.getById.useQuery(
-    { id: createFormData.entryRequestId },
-    { enabled: !!createFormData.entryRequestId }
+
+  // Entry Request 승인 완료된 것만 필터링 (먼저 정의)
+  const approvedEntryRequests = entryRequests?.filter(
+    (req) => req.status === "ep_approved"
   );
 
-  // 반입 요청에 포함된 장비/인력 ID 목록 추출
-  const approvedEquipmentIds = selectedEntryRequest?.items
-    ?.filter((item: any) => item.itemType === 'equipment')
-    ?.map((item: any) => item.itemId) || [];
-  
-  const approvedWorkerIds = selectedEntryRequest?.items
-    ?.filter((item: any) => item.itemType === 'worker')
-    ?.map((item: any) => item.itemId) || [];
+  // 🔍 디버깅: 반입 요청 데이터 확인
+  console.log('=== [Deployments] 디버깅 시작 ===');
+  console.log('1. 전체 반입 요청 개수:', entryRequests?.length || 0);
+  console.log('2. EP 승인된 반입 요청 개수:', approvedEntryRequests?.length || 0);
 
-  // 필터링된 장비/인력 목록
-  // 1. 반입 요청이 선택된 경우: 해당 요청의 장비만
-  // 2. 운전자가 선택된 경우: 해당 운전자에 배정된 장비만
-  // 3. 둘 다 선택된 경우: 교집합 (반입 요청의 장비 중 운전자에 배정된 것)
-  let filteredEquipment = equipment || [];
-  
-  if (createFormData.entryRequestId && approvedEquipmentIds.length > 0) {
-    // 반입 요청의 장비만 필터링
-    filteredEquipment = filteredEquipment.filter((e) => approvedEquipmentIds.includes(e.id));
+  if (approvedEntryRequests && approvedEntryRequests.length > 0) {
+    console.log('3. EP 승인된 반입 요청 목록:');
+    approvedEntryRequests.forEach((req, idx) => {
+      console.log(`   [${idx}] ID: ${req.id}, Status: ${req.status}, Items: ${req.items?.length || 0}개`);
+      if (req.items && req.items.length > 0) {
+        req.items.forEach((item: any, itemIdx: number) => {
+          console.log(`      [${itemIdx}] Type: ${item.itemType || item.item_type}, ID: ${item.itemId || item.item_id}`);
+        });
+      } else {
+        console.warn('      ⚠️ items가 없거나 비어있음!');
+      }
+    });
+  } else {
+    console.warn('⚠️ EP 승인된 반입 요청이 없습니다!');
   }
-  
-  if (createFormData.workerId) {
-    // 선택한 운전자에 배정된 장비만 필터링
-    // assignedWorkerId (camelCase) 또는 assigned_worker_id (snake_case) 모두 확인
-    filteredEquipment = filteredEquipment.filter((e: any) => 
-      (e.assignedWorkerId === createFormData.workerId) || 
-      (e.assigned_worker_id === createFormData.workerId)
-    );
-  }
-  
-  const availableEquipment = filteredEquipment;
-  
-  // 인력 필터링 (반입 요청만 고려)
-  const availableWorkers = createFormData.entryRequestId && approvedWorkerIds.length > 0
-    ? workers?.filter((w) => approvedWorkerIds.includes(w.id)) || []
-    : workers || [];
+
+  // EP 승인 완료된 반입 요청의 모든 아이템 ID 추출
+  const approvedEquipmentIds = new Set<string>();
+  const approvedWorkerIds = new Set<string>();
+  const equipmentToEntryRequestMap = new Map<string, string>(); // 장비 ID -> 반입 요청 ID
+
+  approvedEntryRequests?.forEach((req) => {
+    req.items?.forEach((item: any) => {
+      const itemType = item.itemType || item.item_type;
+      const itemId = item.itemId || item.item_id;
+
+      if (itemType === 'equipment' && itemId) {
+        approvedEquipmentIds.add(itemId);
+        equipmentToEntryRequestMap.set(itemId, req.id);
+      } else if (itemType === 'worker' && itemId) {
+        approvedWorkerIds.add(itemId);
+      }
+    });
+  });
+
+  console.log('4. 추출된 장비 ID:', Array.from(approvedEquipmentIds));
+  console.log('5. 추출된 인력 ID:', Array.from(approvedWorkerIds));
+  console.log('6. 전체 장비 개수:', equipment?.length || 0);
+  console.log('7. 전체 인력 개수:', workers?.length || 0);
+
+  // EP 승인된 장비/인력만 표시
+  const availableEquipment = equipment?.filter((e) => approvedEquipmentIds.has(e.id)) || [];
+  const availableWorkers = workers?.filter((w) => approvedWorkerIds.has(w.id)) || [];
+
+  console.log('8. 필터링된 장비 개수:', availableEquipment.length);
+  console.log('9. 필터링된 인력 개수:', availableWorkers.length);
+  console.log('=== [Deployments] 디버깅 종료 ===\n');
 
   // Mutations
   const createMutation = trpc.deployments.create.useMutation({
@@ -176,6 +192,12 @@ export default function Deployments() {
       bpCompanyId: "",
       startDate: "",
       plannedEndDate: "",
+      siteName: "",
+      workType: "daily",
+      dailyRate: "",
+      monthlyRate: "",
+      otRate: "",
+      nightRate: "",
     });
   };
 
@@ -257,11 +279,6 @@ export default function Deployments() {
     const config = statusMap[status] || { label: status, variant: "default" };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
-
-  // Entry Request 승인 완료된 것만 필터링
-  const approvedEntryRequests = entryRequests?.filter(
-    (req) => req.status === "ep_approved"
-  );
 
   return (
     <div className="space-y-6">
@@ -436,38 +453,16 @@ export default function Deployments() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="entryRequestId">반입 요청 <span className="text-destructive">*</span></Label>
-              <Select
-                value={createFormData.entryRequestId}
-                onValueChange={(value) => {
-                  const request = approvedEntryRequests?.find((r) => r.id === value);
-                  setCreateFormData({
-                    ...createFormData,
-                    entryRequestId: value,
-                    bpCompanyId: request?.targetBpCompanyId || request?.target_bp_company_id || "",
-                    // 장비와 인력은 자동으로 채우지 않음 (사용자가 직접 선택)
-                  });
-                }}
-              >
-                <SelectTrigger id="entryRequestId">
-                  <SelectValue placeholder="반입 요청 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {approvedEntryRequests?.map((req) => (
-                    <SelectItem key={req.id} value={req.id}>
-                      {req.requestNumber} - {req.purpose || "목적 없음"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                반입 요청을 선택하면 해당 요청에 포함된 장비와 인력만 표시됩니다. 조합해서 선택하세요.
+            {/* 반입 요청 자동 선택 안내 */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-900">
+                <strong>💡 안내:</strong> EP 승인 완료된 장비와 인력만 선택할 수 있습니다.
+                반입 요청은 장비 선택 시 자동으로 연결됩니다.
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="bpCompanyId">BP 현장 (협력업체)</Label>
+              <Label htmlFor="bpCompanyId">BP 현장 (협력업체) <span className="text-destructive">*</span></Label>
               <Select
                 value={createFormData.bpCompanyId}
                 onValueChange={(value) =>
@@ -486,18 +481,24 @@ export default function Deployments() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                반입 승인을 받으면 어느 BP 현장이든 투입 가능합니다
+                투입할 BP 현장을 선택하세요
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="equipmentId">장비</Label>
+                <Label htmlFor="equipmentId">장비 <span className="text-destructive">*</span></Label>
                 <Select
                   value={createFormData.equipmentId}
-                  onValueChange={(value) =>
-                    setCreateFormData({ ...createFormData, equipmentId: value })
-                  }
+                  onValueChange={(value) => {
+                    // 장비 선택 시 자동으로 반입 요청 ID 설정
+                    const entryRequestId = equipmentToEntryRequestMap.get(value) || "";
+                    setCreateFormData({
+                      ...createFormData,
+                      equipmentId: value,
+                      entryRequestId: entryRequestId
+                    });
+                  }}
                 >
                   <SelectTrigger id="equipmentId">
                     <SelectValue placeholder="장비 선택" />
@@ -505,9 +506,7 @@ export default function Deployments() {
                   <SelectContent>
                     {availableEquipment.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        {createFormData.entryRequestId 
-                          ? "반입 승인된 장비가 없습니다" 
-                          : "반입 요청을 먼저 선택하세요"}
+                        EP 승인된 장비가 없습니다
                       </div>
                     ) : (
                       availableEquipment.map((equip) => (
@@ -519,24 +518,19 @@ export default function Deployments() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  {createFormData.workerId 
-                    ? `선택한 운전자에 배정된 장비 ${availableEquipment.length}개`
-                    : createFormData.entryRequestId 
-                      ? `반입 승인된 장비 ${availableEquipment.length}개`
-                      : `전체 장비 ${availableEquipment.length}개`}
+                  EP 승인된 장비 {availableEquipment.length}개
                 </p>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="workerId">운전자</Label>
+                <Label htmlFor="workerId">운전자 <span className="text-destructive">*</span></Label>
                 <Select
                   value={createFormData.workerId}
                   onValueChange={(value) => {
-                    setCreateFormData({ 
-                      ...createFormData, 
-                      workerId: value,
-                      // 운전자 변경 시 장비 초기화 (새로운 운전자에 맞는 장비만 표시되도록)
-                      equipmentId: ""
+                    setCreateFormData({
+                      ...createFormData,
+                      workerId: value
+                      // 장비 선택 유지 (초기화하지 않음)
                     });
                   }}
                 >
@@ -546,9 +540,7 @@ export default function Deployments() {
                   <SelectContent>
                     {availableWorkers.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        {createFormData.entryRequestId 
-                          ? "반입 승인된 인력이 없습니다" 
-                          : "반입 요청을 먼저 선택하세요"}
+                        EP 승인된 인력이 없습니다
                       </div>
                     ) : (
                       availableWorkers.map((worker) => (
@@ -559,11 +551,9 @@ export default function Deployments() {
                     )}
                   </SelectContent>
                 </Select>
-                {createFormData.entryRequestId && (
-                  <p className="text-xs text-muted-foreground">
-                    반입 승인된 인력 {availableWorkers.length}개
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  EP 승인된 인력 {availableWorkers.length}개
+                </p>
               </div>
             </div>
 
