@@ -69,7 +69,7 @@ export class RIMSApiClient {
       tokenExpiry = now + 2.5 * 60 * 60 * 1000; // 2.5시간 후 만료 (여유 있게)
 
       console.log('[RIMS] New token issued');
-      return cachedToken;
+      return cachedToken || '';
     } catch (error: any) {
       console.error('[RIMS] Token issuance failed:', error.response?.data || error.message);
       throw new Error('RIMS 토큰 발급 실패');
