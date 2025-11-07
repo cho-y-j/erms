@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { toSnakeCase, toCamelCase, toCamelCaseArray } from './db-utils';
 import {
@@ -767,7 +768,7 @@ export async function getWorkerByPinCode(pinCode: string): Promise<Worker | unde
     const { data: allWorkers } = await supabase
       .from('workers')
       .select('id, name, pin_code');
-    console.log("[Database] All workers with PINs:", allWorkers?.map(w => ({ id: w.id, name: w.name, pin: w.pin_code })));
+    console.log("[Database] All workers with PINs:", allWorkers?.map((w: any) => ({ id: w.id, name: w.name, pin: w.pin_code })));
     return undefined;
   }
 
@@ -1173,7 +1174,7 @@ export async function getWorkJournalsByOwnerId(ownerId: string, filters?: {
       .from('deployments')
       .select('owner_id')
       .limit(10);
-    console.log("[Database] Sample owner_ids in deployments table:", allDeployments?.map(d => d.owner_id));
+    console.log("[Database] Sample owner_ids in deployments table:", allDeployments?.map((d: any) => d.owner_id));
     return []; // No deployments for this owner
   }
 
@@ -1191,7 +1192,7 @@ export async function getWorkJournalsByOwnerId(ownerId: string, filters?: {
     .from('work_journal')
     .select('deployment_id')
     .limit(10);
-  console.log("[Database] Sample deployment_ids in work_journal table:", allWorkJournals?.map(wj => wj.deployment_id));
+  console.log("[Database] Sample deployment_ids in work_journal table:", allWorkJournals?.map((wj: any) => wj.deployment_id));
 
   if (filters?.status) {
     query = query.eq('status', filters.status);
@@ -2492,8 +2493,8 @@ export async function getApplicableTemplatesForEquipment(
 
   // 장비 타입 정보 별도로 조회 (필요한 경우)
   if (templates && templates.length > 0) {
-    const templateIds = templates.map(t => t.id);
-    const equipTypeIds = templates.map(t => t.equip_type_id).filter(id => id);
+    const templateIds = templates.map((t: any) => t.id);
+    const equipTypeIds = templates.map((t: any) => t.equip_type_id).filter((id: any) => id);
 
     if (equipTypeIds.length > 0) {
       const { data: equipTypes } = await supabase
@@ -2502,8 +2503,8 @@ export async function getApplicableTemplatesForEquipment(
         .in('id', equipTypeIds);
 
       // 템플릿에 장비 타입 정보 매핑
-      const equipTypeMap = new Map(equipTypes?.map(et => [et.id, et]) || []);
-      templates.forEach(template => {
+      const equipTypeMap = new Map(equipTypes?.map((et: any) => [et.id, et]) || []);
+      templates.forEach((template: any) => {
         if (template.equip_type_id) {
           template.equip_type = equipTypeMap.get(template.equip_type_id);
         }
@@ -2840,8 +2841,8 @@ export async function getAllActiveLocations(filters?: {
           .eq('status', 'active');
         
         if (deployments && deployments.length > 0) {
-          const equipmentIds = deployments.map(d => d.equipment_id).filter(Boolean);
-          const workerIds = deployments.map(d => d.worker_id).filter(Boolean);
+          const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
+          const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
           
           if (equipmentIds.length > 0 || workerIds.length > 0) {
             const conditions: string[] = [];
