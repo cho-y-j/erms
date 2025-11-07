@@ -201,6 +201,13 @@ export const safetyInspectionRouter = router({
       const userRole = ctx.user.role?.toLowerCase();
       const inspectorType = userRole === "inspector" ? "inspector" : "driver";
 
+      // 장비 타입 이름 가져오기
+      let equipmentName = "";
+      if (equipment.equipTypeId) {
+        const equipType = await db.getEquipTypeById(equipment.equipTypeId);
+        equipmentName = equipType?.name || "";
+      }
+
       return await db.createSafetyInspection({
         id,
         templateId: input.templateId,
@@ -210,7 +217,7 @@ export const safetyInspectionRouter = router({
         inspectionDate: input.inspectionDate,
         checkFrequency: input.checkFrequency,
         vehicleNumber: equipment.regNum,
-        equipmentName: equipment.equipType?.name || "",
+        equipmentName,
         status: "draft",
       });
     }),
@@ -313,7 +320,9 @@ export const safetyInspectionRouter = router({
         });
       }
 
-      if (inspection.status !== "draft") {
+      // inspection 객체에서 status 확인 (results가 아닌 inspection 자체의 status)
+      const inspectionStatus = (inspection as any).status;
+      if (inspectionStatus !== "draft") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "초안 상태의 점검만 제출할 수 있습니다.",

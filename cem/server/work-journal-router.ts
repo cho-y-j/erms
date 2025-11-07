@@ -351,7 +351,7 @@ export const workJournalRouter = router({
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
           signatureData: j.signatureData,
-          signerName: j.signerName,
+          signerName: j.bpSignerName || j.signerName,
         });
         return acc;
       }, {});
@@ -411,7 +411,7 @@ export const workJournalRouter = router({
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
           signatureData: j.signatureData,
-          signerName: j.signerName,
+          signerName: j.bpSignerName || j.signerName,
         });
         return acc;
       }, {});
@@ -472,7 +472,7 @@ export const workJournalRouter = router({
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
           signatureData: j.signatureData,
-          signerName: j.signerName,
+          signerName: j.bpSignerName || j.signerName,
         });
         return acc;
       }, {});

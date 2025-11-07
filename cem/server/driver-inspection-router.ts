@@ -289,7 +289,9 @@ export const driverInspectionRouter = router({
       
       // 권한 확인: 자신의 기록만 수정 가능 (또는 admin)
       const record = await db.getDriverInspectionRecordById(id);
-      if (record && record.driverId !== ctx.user.id && ctx.user.role !== "admin") {
+      // record는 { ...record, items: [...] } 형태로 반환되므로 driverId는 record 자체에 있음
+      const driverId = (record as any)?.driverId || (record as any)?.items?.[0]?.driverId;
+      if (record && driverId !== ctx.user.id && ctx.user.role !== "admin") {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "수정 권한이 없습니다.",
