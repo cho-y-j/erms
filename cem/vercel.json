@@ -11,9 +11,8 @@
     }
   ],
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 30,
-      "includeFiles": "server/**/*.{ts,js}"
+    "api/index.js": {
+      "maxDuration": 30
     }
   }
 }
