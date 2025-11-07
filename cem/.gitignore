@@ -5,6 +5,7 @@
 # Build outputs
 dist/
 build/
+public/
 *.dist
 api/index.js
 api/index.ts
