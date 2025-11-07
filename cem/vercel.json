@@ -1,20 +1,11 @@
 {
   "buildCommand": "pnpm build",
+  "outputDirectory": "public",
   "installCommand": "pnpm install",
   "functions": {
     "api/index.js": {
       "runtime": "nodejs20.x"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/public/$1"
-    }
-  ]
+  }
 }
 
