@@ -1,4 +1,3 @@
-import "dotenv/config";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../server/routers";
@@ -16,14 +15,19 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // OAuth 라우트 등록
 registerOAuthRoutes(app);
 
-// tRPC API 미들웨어
+// tRPC API 미들웨어 - Vercel rewrite로 /api가 제거되므로 /trpc만 사용
 app.use(
-  "/api/trpc",
+  "/trpc",
   createExpressMiddleware({
     router: appRouter,
     createContext,
   })
 );
+
+// 루트 경로 헬스체크
+app.get("/", (req, res) => {
+  res.json({ status: "ok", message: "ERMS API is running" });
+});
 
 // Vercel serverless 함수 핸들러
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -31,6 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return new Promise<void>((resolve, reject) => {
     app(req as any, res as any, (err: any) => {
       if (err) {
+        console.error("Express error:", err);
         reject(err);
       } else {
         resolve();
