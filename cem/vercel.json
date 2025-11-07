@@ -4,11 +4,13 @@
   "outputDirectory": "dist/public",
   "framework": null,
   "installCommand": "pnpm install",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index?path=/$1"
-    },
+      "source": "/api/:path*",
+      "destination": "/api/index?path=/:path*"
+    }
+  ],
+  "routes": [
     { "handle": "filesystem" },
     {
       "src": "/(.*)",
