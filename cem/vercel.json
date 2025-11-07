@@ -1,17 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "pnpm build",
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "framework": null,
   "installCommand": "pnpm install",
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/(.*)",
       "destination": "/api/index"
     }
   ],
   "functions": {
-    "api/index.ts": {
+    "api/**/*.ts": {
       "maxDuration": 30
     }
   }
