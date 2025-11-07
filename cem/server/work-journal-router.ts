@@ -59,8 +59,8 @@ export const workJournalRouter = router({
         // 현장 정보 (deployment에서 자동 복사)
         siteName: deployment.siteName || "",
         vehicleNumber: equipment.regNum,
-        equipmentName: equipment.equipType?.name,
-        specification: equipment.specification || equipment.equipType?.description,
+        equipmentName: (equipment as any).equipType?.name || "",
+        specification: equipment.specification || (equipment as any).equipType?.description || "",
 
         // 작업 정보 (Worker 입력)
         workDate: new Date(input.workDate),
@@ -72,9 +72,9 @@ export const workJournalRouter = router({
         startTime: input.startTime,
         endTime: input.endTime,
         totalHours: Math.round(totalHours),
-        regularHours: input.regularHours,
-        otHours: input.otHours,
-        nightHours: input.nightHours,
+        regularHours: String(input.regularHours),
+        otHours: String(input.otHours),
+        nightHours: String(input.nightHours),
 
         // 제출 정보
         submittedBy: ctx.user.id,
@@ -329,16 +329,16 @@ export const workJournalRouter = router({
       });
 
       // Deployment별로 그룹화
-      const grouped = journals.reduce((acc: any, j) => {
+      const grouped = journals.reduce((acc: any, j: any) => {
         const depId = j.deploymentId || 'unknown';
         if (!acc[depId]) {
           acc[depId] = {
             deploymentId: depId,
             siteName: j.siteName,
-            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
-            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
-            specification: j.specification || j.equipment?.specification,
-            workerName: j.workerName || j.worker?.name,
+            equipmentRegNum: j.vehicleNumber,
+            equipmentName: j.equipmentName,
+            specification: j.specification,
+            workerName: j.workerName || (j.worker as any)?.name,
             workDays: [],
           };
         }
@@ -350,8 +350,8 @@ export const workJournalRouter = router({
           otHours: j.otHours || 0,
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
-          signatureData: j.signatureData,
-          signerName: j.bpSignerName || j.signerName,
+          signatureData: j.bpSignatureData,
+          signerName: j.bpSignerName,
         });
         return acc;
       }, {});
@@ -381,7 +381,8 @@ export const workJournalRouter = router({
       const startDate = `${input.yearMonth}-01`;
       const endDate = `${input.yearMonth}-31`;
 
-      const journals = await db.getWorkJournalsByBpCompanyId(ctx.user.companyId, {
+      const journals = await db.getWorkJournals({
+        bpCompanyId: ctx.user.companyId || undefined,
         status: undefined, // 모든 상태
         startDate,
         endDate,
@@ -389,16 +390,16 @@ export const workJournalRouter = router({
       });
 
       // Deployment별로 그룹화
-      const grouped = journals.reduce((acc: any, j) => {
+      const grouped = journals.reduce((acc: any, j: any) => {
         const depId = j.deploymentId || 'unknown';
         if (!acc[depId]) {
           acc[depId] = {
             deploymentId: depId,
             siteName: j.siteName,
-            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
-            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
-            specification: j.specification || j.equipment?.specification,
-            workerName: j.workerName || j.worker?.name,
+            equipmentRegNum: j.vehicleNumber,
+            equipmentName: j.equipmentName,
+            specification: j.specification,
+            workerName: j.workerName || (j.worker as any)?.name,
             workDays: [],
           };
         }
@@ -410,8 +411,8 @@ export const workJournalRouter = router({
           otHours: j.otHours || 0,
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
-          signatureData: j.signatureData,
-          signerName: j.bpSignerName || j.signerName,
+          signatureData: j.bpSignatureData,
+          signerName: j.bpSignerName,
         });
         return acc;
       }, {});
@@ -449,17 +450,17 @@ export const workJournalRouter = router({
       });
 
       // Deployment별로 그룹화
-      const grouped = journals.reduce((acc: any, j) => {
+      const grouped = journals.reduce((acc: any, j: any) => {
         const depId = j.deploymentId || 'unknown';
         if (!acc[depId]) {
           acc[depId] = {
             deploymentId: depId,
             siteName: j.siteName,
-            equipmentRegNum: j.vehicleNumber || j.equipment?.regNum,
-            equipmentName: j.equipmentName || j.equipment?.equipType?.name,
-            specification: j.specification || j.equipment?.specification,
-            workerName: j.workerName || j.worker?.name,
-            bpCompanyName: j.bpCompany?.name,
+            equipmentRegNum: j.vehicleNumber,
+            equipmentName: j.equipmentName,
+            specification: j.specification,
+            workerName: j.workerName || (j.worker as any)?.name,
+            bpCompanyName: j.bpCompanyName,
             workDays: [],
           };
         }
@@ -471,8 +472,8 @@ export const workJournalRouter = router({
           otHours: j.otHours || 0,
           nightHours: j.nightHours || 0,
           bpApproved: j.status === 'bp_approved',
-          signatureData: j.signatureData,
-          signerName: j.bpSignerName || j.signerName,
+          signatureData: j.bpSignatureData,
+          signerName: j.bpSignerName,
         });
         return acc;
       }, {});
