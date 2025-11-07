@@ -12,6 +12,23 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Vercel rewrite 시 원래 요청 경로 복원
+app.use((req, _res, next) => {
+  const forwardedPath = req.query?.path;
+
+  if (typeof forwardedPath === "string" && forwardedPath.length > 0) {
+    const restoredPath = forwardedPath.startsWith("/")
+      ? forwardedPath
+      : `/${forwardedPath}`;
+
+    req.url = restoredPath;
+    req.originalUrl = restoredPath;
+    delete (req.query as Record<string, unknown>).path;
+  }
+
+  next();
+});
+
 // OAuth 라우트 등록
 registerOAuthRoutes(app);
 
