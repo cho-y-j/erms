@@ -387,3 +387,6 @@ const worker = await Tesseract.createWorker('kor', 1, {
 **다음 작업**: 환경 변수 설정 후 실제 테스트
 
 
+
+
+

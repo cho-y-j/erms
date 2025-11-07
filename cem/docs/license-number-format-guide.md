@@ -221,3 +221,6 @@ if (cleanLicenseNum.length !== 12) {
 ✅ **이제 명확합니다!**
 
 
+
+
+

@@ -101,7 +101,7 @@ export const locationRouter = router({
     .query(async ({ input, ctx }) => {
       // 사용자 정보에서 role과 companyId 가져오기
       const userRole = ctx.user?.role?.toLowerCase();
-      const userCompanyId = ctx.user?.companyId;
+      const userCompanyId = ctx.user?.companyId ?? undefined;
 
       return await db.getAllActiveLocations({
         ...input,
@@ -110,4 +110,3 @@ export const locationRouter = router({
       });
     }),
 });
-

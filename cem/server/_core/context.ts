@@ -20,18 +20,6 @@ export async function createContext(
     user = null;
   }
 
-  // Development mode: use mock user if no authentication
-  if (!user && process.env.NODE_ENV === 'development') {
-    user = {
-      id: 'dev-user-1',
-      name: '테스트 관리자',
-      email: 'admin@test.com',
-      role: 'Admin',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as User;
-  }
-
   return {
     req: opts.req,
     res: opts.res,
